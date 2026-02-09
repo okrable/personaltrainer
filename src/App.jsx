@@ -91,6 +91,11 @@ const PlanApp = () => {
   const [settings, setSettings] = useState(defaultSettings);
   const [draft, setDraft] = useState(defaultSettings);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [stravaSummary, setStravaSummary] = useState(null);
+  const [aiWorkout, setAiWorkout] = useState(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [statusMessage, setStatusMessage] = useState("");
 
   const planData = useMemo(() => {
     const raceDate = new Date(settings.raceDate);
@@ -143,6 +148,60 @@ const PlanApp = () => {
     setDraft(defaultSettings);
   };
 
+  const handleSyncStrava = async () => {
+    setIsSyncing(true);
+    setStatusMessage("");
+    try {
+      const response = await fetch("/.netlify/functions/strava-history");
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error || "Unable to sync Strava.");
+      }
+      setStravaSummary(payload.summary);
+      setStatusMessage("Strava history synced.");
+    } catch (error) {
+      setStatusMessage(error.message);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleGenerateAI = async () => {
+    if (!stravaSummary) {
+      setStatusMessage("Sync Strava before generating AI workouts.");
+      return;
+    }
+
+    setIsGenerating(true);
+    setStatusMessage("");
+    try {
+      const response = await fetch("/.netlify/functions/ai-workout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          goal: `${settings.goalType} on ${settings.raceDate}`,
+          plan: `Week ${planData.week}, day ${planData.day} of a ${settings.planLength}-week plan.`,
+          preferences: `Terrain: ${settings.terrain}. Time available: ${settings.timeAvailable} minutes.`,
+          summary: stravaSummary,
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error || "Unable to generate AI workout.");
+      }
+      setAiWorkout(payload.workout);
+      setStatusMessage(
+        payload.source === "fallback"
+          ? "AI key missing; using fallback coach logic."
+          : "AI workout ready."
+      );
+    } catch (error) {
+      setStatusMessage(error.message);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   return (
     <div className="app">
       <header className="hero">
@@ -183,6 +242,106 @@ const PlanApp = () => {
           </div>
         </div>
       </section>
+
+      <section className="integrations">
+        <div className="card integration-card">
+          <div>
+            <h3>Strava sync</h3>
+            <p>Pull your latest runs to update training load and recovery signals.</p>
+          </div>
+          <button
+            className="button primary"
+            type="button"
+            onClick={handleSyncStrava}
+            disabled={isSyncing}
+          >
+            {isSyncing ? "Syncing…" : "Sync Strava"}
+          </button>
+        </div>
+        <div className="card integration-card">
+          <div>
+            <h3>AI workout generator</h3>
+            <p>Generate a tailored plan using Strava data and your goal inputs.</p>
+          </div>
+          <button
+            className="button ghost"
+            type="button"
+            onClick={handleGenerateAI}
+            disabled={isGenerating}
+          >
+            {isGenerating ? "Generating…" : "Generate workout"}
+          </button>
+        </div>
+        {statusMessage && <p className="status">{statusMessage}</p>}
+      </section>
+
+      {stravaSummary && (
+        <section className="strava-summary">
+          <h3>Recent training load</h3>
+          <div className="card metrics">
+            <div>
+              <p className="label">Weekly avg</p>
+              <p className="value">{stravaSummary.weeklyAverageKm} km</p>
+            </div>
+            <div>
+              <p className="label">Last 6 weeks elevation</p>
+              <p className="value">{stravaSummary.totalElevationM} m</p>
+            </div>
+            <div>
+              <p className="label">Quality sessions</p>
+              <p className="value">{stravaSummary.qualityCount}</p>
+            </div>
+            <div>
+              <p className="label">Last quality</p>
+              <p className="value">
+                {stravaSummary.lastQualityDays === "N/A"
+                  ? "N/A"
+                  : `${stravaSummary.lastQualityDays} days ago`}
+              </p>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {aiWorkout && (
+        <section className="ai-workout">
+          <h3>AI suggested workout</h3>
+          <div className="workouts">
+            <div className="card workout">
+              <div className="workout-header">
+                <h3>AI Option · Easy</h3>
+              </div>
+              <p className="workout-main">{aiWorkout.easy_option?.title}</p>
+              <p className="workout-detail">{aiWorkout.easy_option?.details}</p>
+            </div>
+            <div className="card workout">
+              <div className="workout-header">
+                <h3>AI Option · Quality</h3>
+              </div>
+              <p className="workout-main">{aiWorkout.quality_option?.title}</p>
+              <p className="workout-detail">{aiWorkout.quality_option?.details}</p>
+            </div>
+          </div>
+          <div className="card ai-reasoning">
+            <h4>Coach reasoning</h4>
+            <ul>
+              {aiWorkout.reasoning?.map((reason) => (
+                <li key={reason}>{reason}</li>
+              ))}
+            </ul>
+            {aiWorkout.warnings?.length ? (
+              <>
+                <h4>Warnings</h4>
+                <ul>
+                  {aiWorkout.warnings.map((warning) => (
+                    <li key={warning}>{warning}</li>
+                  ))}
+                </ul>
+              </>
+            ) : null}
+          </div>
+        </section>
+      )}
 
       <section className="workouts">
         <div className="card workout">

@@ -64,6 +64,44 @@ h1 {
   justify-content: space-between;
 }
 
+.integrations,
+.strava-summary,
+.ai-workout {
+  margin-top: 32px;
+}
+
+.integrations {
+  display: grid;
+  gap: 24px;
+}
+
+.integration-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+}
+
+.integration-card p {
+  margin: 6px 0 0;
+  color: var(--muted);
+}
+
+.status {
+  margin: 8px 0 0;
+  font-size: 0.95rem;
+  color: #e6f0ff;
+}
+
+.ai-reasoning ul {
+  margin: 8px 0 0;
+  padding-left: 20px;
+}
+
+.ai-reasoning h4 {
+  margin: 8px 0;
+}
+
 .summary h2 {
   margin: 0 0 8px;
 }
