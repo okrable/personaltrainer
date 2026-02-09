@@ -6,14 +6,14 @@ A React-based planner that suggests daily run workouts based on your race goal, 
 
 In the project directory, you can run:
 
-### `npm start`
+### `npm run dev`
 
-Runs the app in the development mode.
-
-### `npm test`
-
-Launches the test runner in the interactive watch mode.
+Starts the Vite development server.
 
 ### `npm run build`
 
-Builds the app for production.
+Builds the app for production into the `dist/` directory.
+
+### `npm run preview`
+
+Serves the production build locally for a final check.
