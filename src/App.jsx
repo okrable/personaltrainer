@@ -36,12 +36,6 @@ const daysBetween = (start, end) =>
 const getPhase = (week) =>
   phaseMap.find((phase) => week >= phase.range[0] && week <= phase.range[1])?.name || "Custom";
 
-const getFocus = (inputs) => {
-  if (inputs.trainingLoad === "high") return "Recovery emphasis";
-  if (inputs.lastQuality >= 5) return "Quality session ready";
-  return "Aerobic development";
-};
-
 const parseDayPreference = (value = "") =>
   value
     .split(",")
@@ -154,7 +148,6 @@ const PlanApp = () => {
     const week = Math.max(1, effectiveInputs.planLength - weeksToRace + 1);
     const day = ((effectiveInputs.planLength * 7 - daysToRace) % 7) + 1;
     const phase = getPhase(week);
-    const focus = getFocus(effectiveInputs);
     const preferredQualityType = getPreferredWorkoutType(effectiveInputs, dayName);
 
     return {
@@ -163,7 +156,6 @@ const PlanApp = () => {
       day,
       dayName,
       phase,
-      focus,
       preferredQualityType,
     };
   }, [effectiveInputs]);
@@ -268,70 +260,47 @@ const PlanApp = () => {
       </div>
 
       <header className="hero">
-        <div>
-          <p className="eyebrow">Daily run guidance</p>
-          <h1>Personal Trainer Planner</h1>
-          <p className="subhead">
-            Tailored workouts based on your race goal, time-to-race, and recent training load.
-          </p>
-        </div>
-        <button className="button primary" type="button" onClick={openModal}>
-          Adjust inputs
-        </button>
+        <p className="eyebrow">Daily run guidance</p>
+        <h1>Personal Trainer Planner</h1>
+        <p className="subhead">Runna-style sessions with clear pace and effort for every segment.</p>
       </header>
 
+      <section className="toolbar card">
+        <button className="button ghost toolbar-button" type="button" onClick={openModal}>
+          Adjust inputs
+        </button>
+        <button className="button primary toolbar-button" type="button" onClick={handleSyncStrava} disabled={isSyncing}>
+          {isSyncing ? "Syncing…" : "Sync Strava"}
+        </button>
+        <button className="button ghost toolbar-button" type="button" onClick={handleGenerateAI} disabled={isGenerating}>
+          {isGenerating ? "Generating…" : "Generate workout"}
+        </button>
+      </section>
+
+      {statusMessage && <p className="status">{statusMessage}</p>}
+
       <section className="summary" aria-live="polite">
-        <div>
-          <h2>Your plan overview</h2>
-          <p>
-            {planData.daysToRace} days until race day · {effectiveInputs.goalType}
-          </p>
-        </div>
         <div className="card metrics">
           <div>
-            <p className="label">Training phase</p>
-            <p className="value">{planData.phase}</p>
+            <p className="label">{planData.phase} phase · Week {planData.week}, Day {planData.day}</p>
+            <p className="value">{planData.daysToRace} days until race day</p>
+            <p className="metric-note">{effectiveInputs.goalType}</p>
           </div>
           <div>
-            <p className="label">Week / Day</p>
-            <p className="value">
-              Week {planData.week}, Day {planData.day} ({planData.dayName})
-            </p>
+            <p className="label">Today</p>
+            <p className="value">{planData.dayName}</p>
           </div>
           <div>
-            <p className="label">Quality type today</p>
+            <p className="label">Quality type</p>
             <p className="value quality-highlight">{planData.preferredQualityType}</p>
             {hasStravaOverrides ? <p className="metric-note">Auto from Strava sync</p> : null}
           </div>
         </div>
       </section>
 
-      <section className="integrations">
-        <div className="card integration-card">
-          <div>
-            <h3>Strava sync</h3>
-            <p>Pull your latest runs to update training load and recovery signals.</p>
-          </div>
-          <button className="button primary" type="button" onClick={handleSyncStrava} disabled={isSyncing}>
-            {isSyncing ? "Syncing…" : "Sync Strava"}
-          </button>
-        </div>
-        <div className="card integration-card">
-          <div>
-            <h3>AI workout generator</h3>
-            <p>Generate a tailored plan using Strava data and your goal inputs.</p>
-          </div>
-          <button className="button ghost" type="button" onClick={handleGenerateAI} disabled={isGenerating}>
-            {isGenerating ? "Generating…" : "Generate workout"}
-          </button>
-        </div>
-        {statusMessage && <p className="status">{statusMessage}</p>}
-      </section>
-
       {stravaSummary && (
         <section className="strava-summary">
           <h3>Recent training load</h3>
-          <p className="section-note">Synced data now overrides manual Training load and Last quality fields.</p>
           <div className="card metrics">
             <div>
               <p className="label">Weekly avg</p>
