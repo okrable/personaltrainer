@@ -22,15 +22,11 @@ Recent training summary from Strava:
 
 Rules:
 - The quality option MUST match today's preferred quality type: ${preferredQualityType}.
-- Easy option rules:
-  - Keep it to one simple prescription only.
-  - No intervals, no reps, no target pace, and no RPE.
-  - Use conversational pace wording only.
-  - segments should be empty or contain only one simple conversational segment.
-  - Determine easy-run distance from the Strava summary (weekly distance trends and recent load should size the distance).
-- Quality option rules:
-  - Use a clear warm-up / main set / cool-down structure.
-  - Include structured segments with target pace and effort ranges where needed.
+- The quality option MUST include a clearly named warm-up segment and a clearly named cool-down segment.
+- Every segment must have a specific target pace and an effort range.
+- Use a clear segment structure so the athlete always knows exactly how hard to run at each point.
+- Warm-up and cool-down instructions must use conversational/easy effort language.
+- For hard rep-based, interval, or hill sessions, recoveries must explicitly allow or encourage walking rest.
 - If weekly load is high or last quality session was <2 days ago, reduce intensity and volume.
 
 Output in JSON only, no markdown, using exactly this schema:
@@ -76,29 +72,92 @@ Output in JSON only, no markdown, using exactly this schema:
 }
 `.trim();
 
-const computeFallbackEasyDistanceKm = (summary) => {
-  const weeklyAverageKm = Number(summary.weeklyAverageKm) || 0;
-  const weeklyDistances = Array.isArray(summary.weeklyDistancesKm)
-    ? summary.weeklyDistancesKm.filter((distance) => Number.isFinite(Number(distance))).map(Number)
-    : [];
-  const lastQualityDays = Number(summary.lastQualityDays);
+const defaultWarmUpSegment = {
+  name: "Warm-up",
+  instruction: "10-15 min easy conversational jog with relaxed mobility drills",
+  target_pace: "5:50-6:20 min/km",
+  rpe: "2-3",
+  workout_type: "RUN",
+};
 
-  const recentWeekKm = weeklyDistances.length ? weeklyDistances[weeklyDistances.length - 1] : weeklyAverageKm;
-  const priorWeekKm = weeklyDistances.length > 1 ? weeklyDistances[weeklyDistances.length - 2] : recentWeekKm;
-  const trendRatio = priorWeekKm > 0 ? recentWeekKm / priorWeekKm : 1;
+const defaultCoolDownSegment = {
+  name: "Cool down",
+  instruction: "8-12 min very easy conversational jog to finish relaxed",
+  target_pace: "6:00-6:30 min/km",
+  rpe: "2-3",
+  workout_type: "RUN",
+};
 
-  // Typical easy day is around 20-30% of weekly load, then tuned by recovery and trend.
-  const baseDistanceKm = Math.max(5, weeklyAverageKm * 0.24);
-  const recoveryAdjustment =
-    Number.isFinite(lastQualityDays) && lastQualityDays <= 1
-      ? 0.85
-      : Number.isFinite(lastQualityDays) && lastQualityDays >= 4
-        ? 1.08
-        : 1;
-  const trendAdjustment = trendRatio >= 1.15 ? 0.92 : trendRatio <= 0.9 ? 1.05 : 1;
+const segmentIsWarmUp = (segment = {}) => /warm\s*-?up/i.test(segment.name || "");
+const segmentIsCoolDown = (segment = {}) => /cool\s*-?down/i.test(segment.name || "");
 
-  const adjustedDistanceKm = baseDistanceKm * recoveryAdjustment * trendAdjustment;
-  return Math.min(18, Math.max(5, Math.round(adjustedDistanceKm * 2) / 2));
+const isHardQualitySession = (qualityOption = {}) => {
+  const rpeMatch = (qualityOption.rpe || "").match(/\d+/g) || [];
+  const maxRpe = Math.max(...rpeMatch.map(Number), 0);
+  const text = `${qualityOption.title || ""} ${qualityOption.details || ""}`;
+  const hardType = /(interval|hill|rep|repetition|vo2|max|speed)/i.test(text);
+  return maxRpe >= 7 || hardType;
+};
+
+const normalizeRecoveryInstruction = (instruction = "") => {
+  if (!instruction) return instruction;
+  if (/walking\s*rest/i.test(instruction)) return instruction;
+
+  if (/easy jog recovery|jog recovery/i.test(instruction)) {
+    return instruction.replace(/easy jog recovery|jog recovery/gi, "walking rest recovery");
+  }
+
+  if (/recover(y|ies)|rest/i.test(instruction)) {
+    return `${instruction} Use walking rest recoveries between hard reps.`;
+  }
+
+  return instruction;
+};
+
+const ensureEasyPacingLanguage = (segment = {}) => {
+  const instruction = segment.instruction || "";
+  if (/easy|conversational/i.test(instruction)) return segment;
+  return {
+    ...segment,
+    instruction: `${instruction}${instruction ? " " : ""}Keep effort easy and conversational.`,
+  };
+};
+
+const sanitizeWorkout = (workout = {}) => {
+  const qualityOption = workout.quality_option || {};
+  const segments = Array.isArray(qualityOption.segments) ? [...qualityOption.segments] : [];
+  const hasWarmUp = segments.some(segmentIsWarmUp);
+  const hasCoolDown = segments.some(segmentIsCoolDown);
+
+  if (!hasWarmUp) {
+    segments.unshift({ ...defaultWarmUpSegment });
+  }
+  if (!hasCoolDown) {
+    segments.push({ ...defaultCoolDownSegment });
+  }
+
+  const hardSession = isHardQualitySession(qualityOption);
+  const normalizedSegments = segments.map((segment) => {
+    let nextSegment = { ...segment };
+
+    if (hardSession && /rest|recover/i.test(nextSegment.instruction || "")) {
+      nextSegment.instruction = normalizeRecoveryInstruction(nextSegment.instruction);
+    }
+
+    if (segmentIsWarmUp(nextSegment) || segmentIsCoolDown(nextSegment)) {
+      nextSegment = ensureEasyPacingLanguage(nextSegment);
+    }
+
+    return nextSegment;
+  });
+
+  return {
+    ...workout,
+    quality_option: {
+      ...qualityOption,
+      segments: normalizedSegments,
+    },
+  };
 };
 
 const fallbackWorkout = ({ summary, preferredQualityType }) => {
@@ -121,7 +180,7 @@ const fallbackWorkout = ({ summary, preferredQualityType }) => {
         },
         {
           name: "Intervals",
-          instruction: "800 m strong, 400 m easy jog recovery",
+          instruction: "800 m strong, 400 m walking rest recovery",
           target_pace: "4:35-4:50 min/km",
           rpe: "7-8",
           repeat: 5,
@@ -144,7 +203,7 @@ const fallbackWorkout = ({ summary, preferredQualityType }) => {
       segments: [
         {
           name: "Warm-up",
-          instruction: "15 min easy jog and mobility drills",
+          instruction: "15 min easy conversational jog and mobility drills",
           target_pace: "5:45-6:05 min/km",
           rpe: "2-3",
           workout_type: "RUN",
@@ -159,7 +218,7 @@ const fallbackWorkout = ({ summary, preferredQualityType }) => {
         },
         {
           name: "Cool down",
-          instruction: "10 min easy jog",
+          instruction: "10 min easy conversational jog",
           target_pace: "5:55-6:20 min/km",
           rpe: "2-3",
           workout_type: "RUN",
@@ -173,8 +232,15 @@ const fallbackWorkout = ({ summary, preferredQualityType }) => {
       details: "Long run progression with clear pacing from start to finish.",
       segments: [
         {
+          name: "Warm-up",
+          instruction: "12 min easy conversational jog to settle into rhythm",
+          target_pace: "5:45-6:05 min/km",
+          rpe: "2-3",
+          workout_type: "RUN",
+        },
+        {
           name: "Settle in",
-          instruction: "40 min comfortable aerobic running",
+          instruction: "30 min comfortable aerobic running",
           target_pace: "5:40-5:55 min/km",
           rpe: "4",
           workout_type: "RUN",
@@ -191,6 +257,13 @@ const fallbackWorkout = ({ summary, preferredQualityType }) => {
           instruction: "10 min strong but controlled",
           target_pace: "5:05-5:15 min/km",
           rpe: "6",
+          workout_type: "RUN",
+        },
+        {
+          name: "Cool down",
+          instruction: "8 min easy conversational jog",
+          target_pace: "5:55-6:20 min/km",
+          rpe: "2-3",
           workout_type: "RUN",
         },
       ],
@@ -287,7 +360,7 @@ exports.handler = async (event) => {
 
     return {
       statusCode: 200,
-      body: JSON.stringify({ workout, source: "groq" }),
+      body: JSON.stringify({ workout: sanitizeWorkout(workout), source: "groq" }),
     };
   } catch (error) {
     return {
