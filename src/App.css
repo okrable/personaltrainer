@@ -148,15 +148,6 @@ h1 {
   color: #e6f0ff;
 }
 
-.ai-reasoning ul {
-  margin: 8px 0 0;
-  padding-left: 20px;
-}
-
-.ai-reasoning h4 {
-  margin: 8px 0;
-}
-
 .summary h2 {
   margin: 0 0 8px;
 }
@@ -170,6 +161,10 @@ h1 {
   margin: 6px 0 0;
   font-size: 0.78rem;
   color: var(--muted);
+}
+
+.quality-highlight {
+  text-transform: capitalize;
 }
 
 .section-note {
@@ -216,58 +211,167 @@ select:disabled {
   font-weight: 600;
 }
 
-.workouts {
-  margin-top: 32px;
+.runna-stack {
+  margin-top: 16px;
   display: grid;
-  gap: 24px;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 18px;
 }
 
-.workout-header {
+.runna-card {
+  overflow: hidden;
+  border-radius: 18px;
+  background: #182338;
+  box-shadow: 0 16px 32px rgba(4, 9, 18, 0.35);
+}
+
+.runna-card-header {
+  padding: 8px 16px;
+}
+
+.runna-card-header h4 {
+  margin: 0;
+  font-size: 1.3rem;
+  color: #f7fbff;
+}
+
+.runna-easy .runna-card-header {
+  background: linear-gradient(90deg, #f98457, #f06542);
+}
+
+.runna-quality .runna-card-header {
+  background: linear-gradient(90deg, #a6b53f, #94a434);
+}
+
+.runna-card-body {
+  display: grid;
+  grid-template-columns: 56px 1fr;
+  gap: 14px;
+  padding: 18px 20px;
+  align-items: start;
+}
+
+.runna-step {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #d6e4ff;
+  border-right: 2px solid rgba(214, 228, 255, 0.25);
+  padding-right: 14px;
+  line-height: 1;
+}
+
+.runna-content {
+  display: grid;
+  gap: 4px;
+}
+
+.runna-tag {
+  margin: 0;
+  color: #42e892;
+  font-weight: 700;
+  font-size: 0.86rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.runna-title {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #f7fbff;
+}
+
+.runna-subtitle {
+  margin: 0;
+  color: #b8c9eb;
+  font-weight: 600;
+}
+
+.runna-segments {
+  margin-top: 8px;
+  display: grid;
+  gap: 10px;
+}
+
+.runna-segment {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  border: 1px solid rgba(126, 153, 192, 0.28);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: rgba(17, 29, 48, 0.55);
+}
+
+.segment-title {
+  margin: 0;
+  color: #f7fbff;
+  font-weight: 700;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
 }
 
-.pill {
-  background: var(--pill);
-  color: var(--primary);
-  padding: 6px 12px;
+.segment-repeat {
+  font-size: 0.72rem;
+  background: rgba(66, 232, 146, 0.15);
+  border: 1px solid rgba(66, 232, 146, 0.45);
+  color: #72f0b2;
+  padding: 2px 8px;
   border-radius: 999px;
-  font-size: 0.8rem;
-  font-weight: 600;
 }
 
-.workout-main {
-  font-size: 1.3rem;
-  margin: 16px 0 8px;
-  font-weight: 600;
+.segment-detail {
+  margin: 6px 0 0;
+  color: #c2d0e8;
+  line-height: 1.35;
+  font-size: 0.92rem;
 }
 
-.workout-detail {
-  margin: 0;
-  color: var(--muted);
-  line-height: 1.5;
-}
-
-.workout-meta {
-  margin: 0 0 10px;
-  color: var(--primary);
+.segment-meta {
+  margin: 6px 0 0;
+  color: #92f0be;
   font-weight: 600;
   font-size: 0.9rem;
 }
 
-.explain {
-  margin-top: 32px;
-  background: var(--surface);
-  border-radius: 18px;
-  padding: 20px 24px;
+.segment-type {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #42e892;
+  align-self: center;
 }
 
-.explain ul {
-  margin: 12px 0 0;
+.coach-grid {
+  margin-top: 20px;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.coach-panel h4 {
+  margin: 0 0 12px;
+}
+
+.coach-list {
+  margin: 0;
   padding-left: 18px;
+  display: grid;
+  gap: 10px;
+  color: var(--muted);
+}
+
+.warning-panel {
+  border: 1px solid color-mix(in srgb, #ff9f43 30%, var(--border));
+  background: color-mix(in srgb, #ff9f43 8%, var(--surface));
+}
+
+.warnings {
+  color: color-mix(in srgb, #ff9f43 75%, var(--text));
+}
+
+.coach-clear {
+  margin: 0;
   color: var(--muted);
 }
 
@@ -295,7 +399,7 @@ select:disabled {
   background: var(--surface);
   border-radius: 20px;
   padding: 24px;
-  width: min(680px, 92vw);
+  width: min(780px, 94vw);
   max-height: 90vh;
   overflow-y: auto;
   box-shadow: 0 24px 50px rgba(16, 34, 58, 0.2);
@@ -343,5 +447,13 @@ select {
   .hero {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .runna-card-body {
+    grid-template-columns: 44px 1fr;
+  }
+
+  .runna-segment {
+    grid-template-columns: 1fr;
   }
 }

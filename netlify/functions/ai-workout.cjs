@@ -1,7 +1,7 @@
 const DEFAULT_BASE_URL = "https://api.groq.com/openai/v1";
 const CHAT_PATH = "/chat/completions";
 
-const buildPrompt = ({ goal, plan, summary, preferences }) => `
+const buildPrompt = ({ goal, plan, summary, preferences, preferredQualityType }) => `
 You are an elite distance running coach writing workouts in a Runna-like style.
 Create two options for today: an easy option and a quality option.
 Use evidence-based training progression, avoid unsafe load spikes, and match the session to time availability.
@@ -9,6 +9,7 @@ Use evidence-based training progression, avoid unsafe load spikes, and match the
 Goal: ${goal}
 Plan timing: ${plan}
 Preferences: ${preferences}
+Preferred quality type for today: ${preferredQualityType}
 
 Recent training summary from Strava:
 - Weekly average: ${summary.weeklyAverageKm} km
@@ -19,10 +20,10 @@ Recent training summary from Strava:
 - Average pace over 6 weeks: ${summary.averagePaceMinKm ?? "N/A"} min/km
 - Fastest recent pace: ${summary.fastestPaceMinKm ?? "N/A"} min/km
 
-Pace guidance rules:
-- Easy pace should usually be ~8-18% slower than average pace and feel conversational (RPE 2-4).
-- Tempo/threshold reps should usually be between average pace and up to 8% faster, based on fatigue.
-- Faster interval reps can be up to ~12-20% faster than average pace, but only if load is manageable.
+Rules:
+- The quality option MUST match today's preferred quality type: ${preferredQualityType}.
+- Every segment must have a specific target pace and an effort range.
+- Use a clear segment structure so the athlete always knows exactly how hard to run at each point.
 - If weekly load is high or last quality session was <2 days ago, reduce intensity and volume.
 
 Output in JSON only, no markdown, using exactly this schema:
@@ -31,51 +32,189 @@ Output in JSON only, no markdown, using exactly this schema:
     "title": "...",
     "target_pace": "... min/km",
     "rpe": "2-4",
-    "details": "Runna-like workout format with warm-up/main/cool-down where relevant"
+    "details": "Short summary sentence",
+    "segments": [
+      {
+        "name": "Warm-up",
+        "instruction": "...",
+        "target_pace": "... min/km",
+        "rpe": "2-3",
+        "workout_type": "RUN"
+      }
+    ]
   },
   "quality_option": {
     "title": "...",
     "target_pace": "... min/km or range",
     "rpe": "6-9",
-    "details": "Runna-like workout format with warm-up/main/cool-down and recoveries"
+    "details": "Short summary sentence",
+    "segments": [
+      {
+        "name": "Warm-up",
+        "instruction": "...",
+        "target_pace": "... min/km",
+        "rpe": "2-3",
+        "workout_type": "RUN"
+      },
+      {
+        "name": "Intervals",
+        "instruction": "...",
+        "target_pace": "... min/km",
+        "rpe": "7-8",
+        "repeat": 6,
+        "workout_type": "RUN"
+      },
+      {
+        "name": "Cool down",
+        "instruction": "...",
+        "target_pace": "... min/km",
+        "rpe": "2-3",
+        "workout_type": "RUN"
+      }
+    ]
   },
   "reasoning": ["...", "...", "..."],
   "warnings": ["..."]
 }
-
-Good quality examples:
-1) Easy progression:
-"10 min warm up, 35 min easy @ 5:35-5:55/km (RPE 3), 4 x 20s relaxed strides, 8 min cool down"
-2) Hill quality:
-"2 km warm up, 10 x 60s uphill @ RPE 8 (jog down recovery), 10 min cool down"
-3) Tempo quality:
-"15 min warm up, 4 x 8 min @ 4:55-5:05/km (2 min easy jog), 10 min cool down"
 `.trim();
 
-const fallbackWorkout = ({ summary }) => ({
-  easy_option: {
-    title: "Easy aerobic run",
-    target_pace: "5:35-5:55 min/km",
-    rpe: "2-4",
-    details: "10 min warm up, 35-45 min easy aerobic running, 5-10 min cool down.",
-  },
-  quality_option: {
-    title: "Progressive tempo",
-    target_pace: "4:55-5:10 min/km",
-    rpe: "6-7",
-    details: "15 min warm up, 3 x 8 min tempo (2 min easy jog), 10 min cool down.",
-  },
-  reasoning: [
-    `Weekly average is ${summary.weeklyAverageKm} km, so a moderate session fits the load.`,
-    "Quality option builds sustained fitness without sharp spikes.",
-  ],
-  warnings: [],
-});
+const fallbackWorkout = ({ summary, preferredQualityType }) => {
+  const qualityLibrary = {
+    intervals: {
+      title: "Interval development session",
+      target_pace: "4:35-4:50 min/km",
+      rpe: "7-8",
+      details: "Structured interval day with clear warm-up, reps, and cool down pacing.",
+      segments: [
+        {
+          name: "Warm-up",
+          instruction: "2 km easy jog with 4 x 20s relaxed strides",
+          target_pace: "5:45-6:05 min/km",
+          rpe: "2-3",
+          workout_type: "RUN",
+        },
+        {
+          name: "Intervals",
+          instruction: "800 m strong, 400 m easy jog recovery",
+          target_pace: "4:35-4:50 min/km",
+          rpe: "7-8",
+          repeat: 5,
+          workout_type: "RUN",
+        },
+        {
+          name: "Cool down",
+          instruction: "1.5 km easy jog",
+          target_pace: "5:55-6:20 min/km",
+          rpe: "2-3",
+          workout_type: "RUN",
+        },
+      ],
+    },
+    tempo: {
+      title: "Tempo control session",
+      target_pace: "4:55-5:05 min/km",
+      rpe: "6-7",
+      details: "Tempo-focused work with clear pace targets for each block.",
+      segments: [
+        {
+          name: "Warm-up",
+          instruction: "15 min easy jog and mobility drills",
+          target_pace: "5:45-6:05 min/km",
+          rpe: "2-3",
+          workout_type: "RUN",
+        },
+        {
+          name: "Tempo reps",
+          instruction: "8 min tempo with 2 min easy jog recovery",
+          target_pace: "4:55-5:05 min/km",
+          rpe: "6-7",
+          repeat: 4,
+          workout_type: "RUN",
+        },
+        {
+          name: "Cool down",
+          instruction: "10 min easy jog",
+          target_pace: "5:55-6:20 min/km",
+          rpe: "2-3",
+          workout_type: "RUN",
+        },
+      ],
+    },
+    "long run": {
+      title: "Progressive long run",
+      target_pace: "5:25-5:50 min/km",
+      rpe: "4-6",
+      details: "Long run progression with clear pacing from start to finish.",
+      segments: [
+        {
+          name: "Settle in",
+          instruction: "40 min comfortable aerobic running",
+          target_pace: "5:40-5:55 min/km",
+          rpe: "4",
+          workout_type: "RUN",
+        },
+        {
+          name: "Steady block",
+          instruction: "25 min steady effort",
+          target_pace: "5:20-5:35 min/km",
+          rpe: "5",
+          workout_type: "RUN",
+        },
+        {
+          name: "Controlled finish",
+          instruction: "10 min strong but controlled",
+          target_pace: "5:05-5:15 min/km",
+          rpe: "6",
+          workout_type: "RUN",
+        },
+      ],
+    },
+  };
+
+  return {
+    easy_option: {
+      title: "Easy aerobic run",
+      target_pace: "5:35-5:55 min/km",
+      rpe: "2-4",
+      details: "Easy run with explicit pacing for warm-up, main set, and cool down.",
+      segments: [
+        {
+          name: "Warm-up",
+          instruction: "10 min relaxed jog",
+          target_pace: "5:50-6:10 min/km",
+          rpe: "2-3",
+          workout_type: "RUN",
+        },
+        {
+          name: "Main run",
+          instruction: "35 min conversational running",
+          target_pace: "5:35-5:55 min/km",
+          rpe: "3-4",
+          workout_type: "RUN",
+        },
+        {
+          name: "Cool down",
+          instruction: "8 min easy jog",
+          target_pace: "5:55-6:20 min/km",
+          rpe: "2-3",
+          workout_type: "RUN",
+        },
+      ],
+    },
+    quality_option: qualityLibrary[preferredQualityType] || qualityLibrary.tempo,
+    reasoning: [
+      `Weekly average is ${summary.weeklyAverageKm} km, so a controlled quality day is appropriate.`,
+      `Today's preferred quality type is ${preferredQualityType}, and the session follows that structure.`,
+      "Segment-level pace guidance is included so effort is clear throughout the workout.",
+    ],
+    warnings: [],
+  };
+};
 
 exports.handler = async (event) => {
   try {
     const body = JSON.parse(event.body || "{}");
-    const { goal, plan, summary, preferences } = body;
+    const { goal, plan, summary, preferences, preferredQualityType = "tempo" } = body;
 
     if (!goal || !plan || !summary) {
       return {
@@ -88,7 +227,7 @@ exports.handler = async (event) => {
       return {
         statusCode: 200,
         body: JSON.stringify({
-          workout: fallbackWorkout({ summary }),
+          workout: fallbackWorkout({ summary, preferredQualityType }),
           source: "fallback",
         }),
       };
@@ -110,7 +249,7 @@ exports.handler = async (event) => {
           },
           {
             role: "user",
-            content: buildPrompt({ goal, plan, summary, preferences }),
+            content: buildPrompt({ goal, plan, summary, preferences, preferredQualityType }),
           },
         ],
         temperature: 0.4,
@@ -132,7 +271,7 @@ exports.handler = async (event) => {
     try {
       workout = JSON.parse(content);
     } catch (error) {
-      workout = fallbackWorkout({ summary });
+      workout = fallbackWorkout({ summary, preferredQualityType });
     }
 
     return {
