@@ -123,7 +123,55 @@ const ensureEasyPacingLanguage = (segment = {}) => {
   };
 };
 
-const sanitizeWorkout = (workout = {}) => {
+const formatDistanceKm = (value) => {
+  const rounded = Math.round(value * 10) / 10;
+  return Number.isInteger(rounded) ? `${rounded}` : rounded.toFixed(1);
+};
+
+const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+
+const extractDistanceKm = (text = "") => {
+  if (!text) return null;
+  const kmMatch = text.match(/(\d+(?:\.\d+)?)\s*km\b/i);
+  if (kmMatch) return Number(kmMatch[1]);
+
+  const meterMatch = text.match(/(\d+(?:\.\d+)?)\s*m\b/i);
+  if (meterMatch) return Number(meterMatch[1]) / 1000;
+
+  return null;
+};
+
+const computeFallbackEasyDistanceKm = (summary = {}) => {
+  const weeklyAverage = Number(summary.weeklyAverageKm);
+  const recentWeekly = Array.isArray(summary.weeklyDistancesKm)
+    ? Number(summary.weeklyDistancesKm[summary.weeklyDistancesKm.length - 1])
+    : NaN;
+  const baseline = Number.isFinite(weeklyAverage) && weeklyAverage > 0 ? weeklyAverage : recentWeekly;
+
+  if (!Number.isFinite(baseline) || baseline <= 0) return 8;
+
+  const suggested = clamp(baseline * 0.22, 5, 16);
+  return Number(formatDistanceKm(suggested));
+};
+
+const ensureDistanceInInstruction = (instruction = "", distanceKm) => {
+  if (extractDistanceKm(instruction)) return instruction;
+  return `${instruction}${instruction ? " " : ""}Recommended distance: ${formatDistanceKm(distanceKm)} km.`;
+};
+
+const sanitizeWorkout = (workout = {}, summary = {}) => {
+  const easyOption = workout.easy_option || {};
+  const easySegments = Array.isArray(easyOption.segments) ? easyOption.segments : [];
+  const easyDistanceKm =
+    Number(easyOption.distance_km) ||
+    extractDistanceKm(easyOption.details || "") ||
+    easySegments.map((segment) => extractDistanceKm(segment.instruction || "")).find(Boolean) ||
+    extractDistanceKm(easyOption.title || "") ||
+    computeFallbackEasyDistanceKm(summary);
+
+  const warmUpDistanceKm = Number(formatDistanceKm(clamp(easyDistanceKm * 0.22, 1.5, 3)));
+  const coolDownDistanceKm = Number(formatDistanceKm(clamp(easyDistanceKm * 0.16, 1, 2.5)));
+
   const qualityOption = workout.quality_option || {};
   const segments = Array.isArray(qualityOption.segments) ? [...qualityOption.segments] : [];
   const hasWarmUp = segments.some(segmentIsWarmUp);
@@ -146,6 +194,8 @@ const sanitizeWorkout = (workout = {}) => {
 
     if (segmentIsWarmUp(nextSegment) || segmentIsCoolDown(nextSegment)) {
       nextSegment = ensureEasyPacingLanguage(nextSegment);
+      const recommendedDistance = segmentIsWarmUp(nextSegment) ? warmUpDistanceKm : coolDownDistanceKm;
+      nextSegment.instruction = ensureDistanceInInstruction(nextSegment.instruction, recommendedDistance);
     }
 
     return nextSegment;
@@ -153,6 +203,24 @@ const sanitizeWorkout = (workout = {}) => {
 
   return {
     ...workout,
+    easy_option: {
+      ...easyOption,
+      distance_km: Number(formatDistanceKm(easyDistanceKm)),
+      details: ensureDistanceInInstruction(easyOption.details || "", easyDistanceKm),
+      segments:
+        easySegments.length > 0
+          ? easySegments.map((segment) => ({
+              ...segment,
+              instruction: ensureDistanceInInstruction(segment.instruction || "", easyDistanceKm),
+            }))
+          : [
+              {
+                name: "Easy run",
+                instruction: `Run ${formatDistanceKm(easyDistanceKm)} km at conversational effort.`,
+                workout_type: "RUN",
+              },
+            ],
+    },
     quality_option: {
       ...qualityOption,
       segments: normalizedSegments,
@@ -275,6 +343,7 @@ const fallbackWorkout = ({ summary, preferredQualityType }) => {
   return {
     easy_option: {
       title: "Easy aerobic run",
+      distance_km: easyDistanceKm,
       details: `Run ${easyDistanceKm} km at conversational pace.`,
       segments: [
         {
@@ -360,7 +429,7 @@ exports.handler = async (event) => {
 
     return {
       statusCode: 200,
-      body: JSON.stringify({ workout: sanitizeWorkout(workout), source: "groq" }),
+      body: JSON.stringify({ workout: sanitizeWorkout(workout, summary), source: "groq" }),
     };
   } catch (error) {
     return {
