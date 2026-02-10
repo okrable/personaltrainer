@@ -87,6 +87,45 @@ const buildReasons = (inputs, week, phase, focus) => [
   `Focus for today: ${focus}.`,
 ];
 
+
+const deriveTrainingLoadFromStrava = (summary) => {
+  if (!summary) return null;
+
+  const distances = summary.weeklyDistancesKm || [];
+  const latestWeek = distances[distances.length - 1] || 0;
+  const averageWeek = summary.weeklyAverageKm || 0;
+  const lastQualityDays = Number(summary.lastQualityDays);
+
+  if (
+    (averageWeek > 0 && latestWeek > averageWeek * 1.15) ||
+    (Number.isFinite(lastQualityDays) && lastQualityDays <= 2) ||
+    summary.qualityCount >= 3
+  ) {
+    return "high";
+  }
+
+  if (
+    (averageWeek > 0 && latestWeek < averageWeek * 0.75) ||
+    summary.recentRuns <= 3
+  ) {
+    return "low";
+  }
+
+  return "moderate";
+};
+
+const renderAiMeta = (option) => {
+  if (!option) return null;
+
+  return (
+    <p className="workout-meta">
+      {option.target_pace ? `Target pace: ${option.target_pace}` : null}
+      {option.target_pace && option.rpe ? " · " : null}
+      {option.rpe ? `RPE: ${option.rpe}` : null}
+    </p>
+  );
+};
+
 const PlanApp = () => {
   const [settings, setSettings] = useState(defaultSettings);
   const [draft, setDraft] = useState(defaultSettings);
@@ -96,21 +135,40 @@ const PlanApp = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
-  const [isDarkMode, setIsDarkMode] = useState(true);
+  const [isDarkMode, setIsDarkMode] = useState(false);
+  const hasStravaOverrides = Boolean(stravaSummary);
+
 
   useEffect(() => {
     document.body.classList.toggle("dark-mode", isDarkMode);
   }, [isDarkMode]);
 
+  const effectiveInputs = useMemo(() => {
+    if (!stravaSummary) {
+      return settings;
+    }
+
+    const inferredLoad = deriveTrainingLoadFromStrava(stravaSummary);
+    const inferredLastQuality = Number.isFinite(Number(stravaSummary.lastQualityDays))
+      ? Number(stravaSummary.lastQualityDays)
+      : settings.lastQuality;
+
+    return {
+      ...settings,
+      trainingLoad: inferredLoad || settings.trainingLoad,
+      lastQuality: inferredLastQuality,
+    };
+  }, [settings, stravaSummary]);
+
   const planData = useMemo(() => {
-    const raceDate = new Date(settings.raceDate);
+    const raceDate = new Date(effectiveInputs.raceDate);
     const today = new Date();
     const daysToRace = daysBetween(today, raceDate);
     const weeksToRace = Math.ceil(daysToRace / 7);
-    const week = Math.max(1, settings.planLength - weeksToRace + 1);
-    const day = ((settings.planLength * 7 - daysToRace) % 7) + 1;
+    const week = Math.max(1, effectiveInputs.planLength - weeksToRace + 1);
+    const day = ((effectiveInputs.planLength * 7 - daysToRace) % 7) + 1;
     const phase = getPhase(week);
-    const focus = getFocus(settings);
+    const focus = getFocus(effectiveInputs);
 
     return {
       daysToRace,
@@ -118,11 +176,11 @@ const PlanApp = () => {
       day,
       phase,
       focus,
-      easyRun: deriveEasyRun(settings),
-      qualityRun: deriveQuality(settings),
-      reasons: buildReasons({ ...settings, daysToRace }, week, phase, focus),
+      easyRun: deriveEasyRun(effectiveInputs),
+      qualityRun: deriveQuality(effectiveInputs),
+      reasons: buildReasons({ ...effectiveInputs, daysToRace }, week, phase, focus),
     };
-  }, [settings]);
+  }, [effectiveInputs]);
 
   const openModal = () => {
     setDraft(settings);
@@ -137,9 +195,13 @@ const PlanApp = () => {
     const { name, value } = event.target;
     setDraft((prev) => ({
       ...prev,
-      [name]: name === "planLength" || name === "weeklyDistance" || name === "timeAvailable" || name === "lastQuality"
-        ? Number(value)
-        : value,
+      [name]:
+        name === "planLength" ||
+        name === "weeklyDistance" ||
+        name === "timeAvailable" ||
+        name === "lastQuality"
+          ? Number(value)
+          : value,
     }));
   };
 
@@ -163,7 +225,7 @@ const PlanApp = () => {
         throw new Error(payload.error || "Unable to sync Strava.");
       }
       setStravaSummary(payload.summary);
-      setStatusMessage("Strava history synced.");
+      setStatusMessage("Strava history synced. Training load and last quality are now driven by Strava.");
     } catch (error) {
       setStatusMessage(error.message);
     } finally {
@@ -186,7 +248,7 @@ const PlanApp = () => {
         body: JSON.stringify({
           goal: `${settings.goalType} on ${settings.raceDate}`,
           plan: `Week ${planData.week}, day ${planData.day} of a ${settings.planLength}-week plan.`,
-          preferences: `Terrain: ${settings.terrain}. Time available: ${settings.timeAvailable} minutes.`,
+          preferences: `Terrain: ${effectiveInputs.terrain}. Time available: ${effectiveInputs.timeAvailable} minutes. Effective load: ${effectiveInputs.trainingLoad}. Last quality: ${effectiveInputs.lastQuality} day(s) ago.`,
           summary: stravaSummary,
         }),
       });
@@ -209,6 +271,18 @@ const PlanApp = () => {
 
   return (
     <div className="app">
+      <div className="top-controls">
+        <label className="toggle">
+          <input
+            type="checkbox"
+            checked={isDarkMode}
+            onChange={(event) => setIsDarkMode(event.target.checked)}
+          />
+          <span className="toggle-slider" />
+          <span className="toggle-label">Dark mode</span>
+        </label>
+      </div>
+
       <header className="hero">
         <div>
           <p className="eyebrow">Daily run guidance</p>
@@ -218,27 +292,16 @@ const PlanApp = () => {
             training load.
           </p>
         </div>
-        <div className="hero-actions">
-          <label className="toggle">
-            <input
-              type="checkbox"
-              checked={isDarkMode}
-              onChange={(event) => setIsDarkMode(event.target.checked)}
-            />
-            <span className="toggle-slider" />
-            <span className="toggle-label">Dark mode</span>
-          </label>
-          <button className="button primary" type="button" onClick={openModal}>
-            Adjust inputs
-          </button>
-        </div>
+        <button className="button primary" type="button" onClick={openModal}>
+          Adjust inputs
+        </button>
       </header>
 
       <section className="summary" aria-live="polite">
         <div>
           <h2>Your plan overview</h2>
           <p>
-            {planData.daysToRace} days until race day · {settings.goalType}
+            {planData.daysToRace} days until race day · {effectiveInputs.goalType}
           </p>
         </div>
         <div className="card metrics">
@@ -255,6 +318,7 @@ const PlanApp = () => {
           <div>
             <p className="label">Suggested focus</p>
             <p className="value">{planData.focus}</p>
+            {hasStravaOverrides ? <p className="metric-note">Auto from Strava sync</p> : null}
           </div>
         </div>
       </section>
@@ -294,6 +358,7 @@ const PlanApp = () => {
       {stravaSummary && (
         <section className="strava-summary">
           <h3>Recent training load</h3>
+          <p className="section-note">Synced data now overrides manual Training load and Last quality fields.</p>
           <div className="card metrics">
             <div>
               <p className="label">Weekly avg</p>
@@ -315,6 +380,18 @@ const PlanApp = () => {
                   : `${stravaSummary.lastQualityDays} days ago`}
               </p>
             </div>
+            {stravaSummary.averagePaceMinKm && (
+              <div>
+                <p className="label">Average pace (6w)</p>
+                <p className="value">{stravaSummary.averagePaceMinKm} min/km</p>
+              </div>
+            )}
+            {stravaSummary.fastestPaceMinKm && (
+              <div>
+                <p className="label">Best pace (6w)</p>
+                <p className="value">{stravaSummary.fastestPaceMinKm} min/km</p>
+              </div>
+            )}
           </div>
         </section>
       )}
@@ -328,6 +405,7 @@ const PlanApp = () => {
                 <h3>AI Option · Easy</h3>
               </div>
               <p className="workout-main">{aiWorkout.easy_option?.title}</p>
+              {renderAiMeta(aiWorkout.easy_option)}
               <p className="workout-detail">{aiWorkout.easy_option?.details}</p>
             </div>
             <div className="card workout">
@@ -335,6 +413,7 @@ const PlanApp = () => {
                 <h3>AI Option · Quality</h3>
               </div>
               <p className="workout-main">{aiWorkout.quality_option?.title}</p>
+              {renderAiMeta(aiWorkout.quality_option)}
               <p className="workout-detail">{aiWorkout.quality_option?.details}</p>
             </div>
           </div>
@@ -444,11 +523,13 @@ const PlanApp = () => {
               </label>
               <label htmlFor="trainingLoad">
                 Current training load
+                {hasStravaOverrides ? <span className="input-hint">Auto-calculated from Strava</span> : null}
                 <select
                   id="trainingLoad"
                   name="trainingLoad"
-                  value={draft.trainingLoad}
+                  value={hasStravaOverrides ? effectiveInputs.trainingLoad : draft.trainingLoad}
                   onChange={handleChange}
+                  disabled={hasStravaOverrides}
                 >
                   <option value="low">Low</option>
                   <option value="moderate">Moderate</option>
@@ -478,14 +559,16 @@ const PlanApp = () => {
               </label>
               <label htmlFor="lastQuality">
                 Last quality workout (days ago)
+                {hasStravaOverrides ? <span className="input-hint">Auto-synced from Strava</span> : null}
                 <input
                   id="lastQuality"
                   name="lastQuality"
                   type="number"
                   min="1"
                   max="14"
-                  value={draft.lastQuality}
+                  value={hasStravaOverrides ? effectiveInputs.lastQuality : draft.lastQuality}
                   onChange={handleChange}
+                  disabled={hasStravaOverrides}
                 />
               </label>
             </div>

@@ -2,32 +2,68 @@ const DEFAULT_BASE_URL = "https://api.groq.com/openai/v1";
 const CHAT_PATH = "/chat/completions";
 
 const buildPrompt = ({ goal, plan, summary, preferences }) => `
-You are a running coach. Use the athlete's context below to recommend two workout options
-(easy + quality). Follow evidence-based training practices, avoid load spikes, and respect
-time available. Provide clear workout details and a short rationale.
+You are an elite distance running coach writing workouts in a Runna-like style.
+Create two options for today: an easy option and a quality option.
+Use evidence-based training progression, avoid unsafe load spikes, and match the session to time availability.
 
 Goal: ${goal}
 Plan timing: ${plan}
 Preferences: ${preferences}
 
-Recent training summary:
+Recent training summary from Strava:
 - Weekly average: ${summary.weeklyAverageKm} km
 - Recent runs: ${summary.recentRuns}
 - Quality sessions: ${summary.qualityCount} (last ${summary.lastQualityDays} days ago)
 - Elevation in last 6 weeks: ${summary.totalElevationM} m
 - Weekly distances: ${summary.weeklyDistancesKm.join(", ")} km
+- Average pace over 6 weeks: ${summary.averagePaceMinKm ?? "N/A"} min/km
+- Fastest recent pace: ${summary.fastestPaceMinKm ?? "N/A"} min/km
 
-Return JSON with keys: easy_option, quality_option, reasoning, warnings.
+Pace guidance rules:
+- Easy pace should usually be ~8-18% slower than average pace and feel conversational (RPE 2-4).
+- Tempo/threshold reps should usually be between average pace and up to 8% faster, based on fatigue.
+- Faster interval reps can be up to ~12-20% faster than average pace, but only if load is manageable.
+- If weekly load is high or last quality session was <2 days ago, reduce intensity and volume.
+
+Output in JSON only, no markdown, using exactly this schema:
+{
+  "easy_option": {
+    "title": "...",
+    "target_pace": "... min/km",
+    "rpe": "2-4",
+    "details": "Runna-like workout format with warm-up/main/cool-down where relevant"
+  },
+  "quality_option": {
+    "title": "...",
+    "target_pace": "... min/km or range",
+    "rpe": "6-9",
+    "details": "Runna-like workout format with warm-up/main/cool-down and recoveries"
+  },
+  "reasoning": ["...", "...", "..."],
+  "warnings": ["..."]
+}
+
+Good quality examples:
+1) Easy progression:
+"10 min warm up, 35 min easy @ 5:35-5:55/km (RPE 3), 4 x 20s relaxed strides, 8 min cool down"
+2) Hill quality:
+"2 km warm up, 10 x 60s uphill @ RPE 8 (jog down recovery), 10 min cool down"
+3) Tempo quality:
+"15 min warm up, 4 x 8 min @ 4:55-5:05/km (2 min easy jog), 10 min cool down"
 `.trim();
 
 const fallbackWorkout = ({ summary }) => ({
   easy_option: {
     title: "Easy aerobic run",
-    details: `Run 45–60 minutes at conversational pace. Keep it relaxed and stop if legs feel heavy.`,
+    target_pace: "5:35-5:55 min/km",
+    rpe: "2-4",
+    details: "10 min warm up, 35-45 min easy aerobic running, 5-10 min cool down.",
   },
   quality_option: {
     title: "Progressive tempo",
-    details: "15 min easy + 3 x 6 min steady (2 min jog) + 10 min cool down.",
+    target_pace: "4:55-5:10 min/km",
+    rpe: "6-7",
+    details: "15 min warm up, 3 x 8 min tempo (2 min easy jog), 10 min cool down.",
   },
   reasoning: [
     `Weekly average is ${summary.weeklyAverageKm} km, so a moderate session fits the load.`,

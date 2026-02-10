@@ -33,3 +33,8 @@ GROQ_BASE_URL=https://api.groq.com/openai/v1
 
 The Strava variables power the `/netlify/functions/strava-history` endpoint, and the Groq
 variables enable AI-generated workouts via `/netlify/functions/ai-workout`.
+
+
+## Input reference
+
+See `GUIDE-README.md` for a detailed explanation of every field in the plan settings modal.

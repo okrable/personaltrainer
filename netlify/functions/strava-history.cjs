@@ -33,18 +33,24 @@ const buildSummary = (activities) => {
   const weeklyBuckets = new Map();
   let totalDistance = 0;
   let totalElevation = 0;
+  let totalMovingTime = 0;
+  let maxAverageSpeed = 0;
   let qualityCount = 0;
   let lastQualityDays = null;
 
   runs.forEach((activity) => {
     totalDistance += activity.distance || 0;
     totalElevation += activity.total_elevation_gain || 0;
+    totalMovingTime += activity.moving_time || 0;
 
     const start = new Date(activity.start_date).getTime();
     const weekKey = Math.floor((now - start) / (7 * 24 * 60 * 60 * 1000));
     weeklyBuckets.set(weekKey, (weeklyBuckets.get(weekKey) || 0) + (activity.distance || 0));
 
     const averageSpeed = activity.average_speed || 0;
+    if (averageSpeed > maxAverageSpeed) {
+      maxAverageSpeed = averageSpeed;
+    }
     const isQuality = activity.workout_type === 1 || averageSpeed >= 3.8;
     if (isQuality) {
       qualityCount += 1;
@@ -62,6 +68,10 @@ const buildSummary = (activities) => {
   const weeklyAverage =
     weeklyDistances.reduce((sum, value) => sum + value, 0) /
     (weeklyDistances.length || 1);
+  const averagePaceMinKm =
+    totalDistance > 0 ? Number(((totalMovingTime / 60) / (totalDistance / 1000)).toFixed(2)) : null;
+  const fastestPaceMinKm =
+    maxAverageSpeed > 0 ? Number((1000 / (maxAverageSpeed * 60)).toFixed(2)) : null;
 
   return {
     totalDistanceKm: Number((totalDistance / 1000).toFixed(1)),
@@ -71,6 +81,8 @@ const buildSummary = (activities) => {
     qualityCount,
     lastQualityDays: lastQualityDays ?? "N/A",
     weeklyDistancesKm: weeklyDistances.map((value) => Number(value.toFixed(1))),
+    averagePaceMinKm,
+    fastestPaceMinKm,
   };
 };
 
