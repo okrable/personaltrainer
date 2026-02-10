@@ -83,8 +83,8 @@ const deriveTrainingLoadFromStrava = (summary) => {
   return "moderate";
 };
 
-const formatPaceTarget = (pace) => {
-  if (!pace) return "By feel";
+const formatPaceTarget = (pace, fallback = "By feel") => {
+  if (!pace) return fallback;
   return pace.replace(" min/km", "/km");
 };
 
@@ -98,7 +98,7 @@ const getWorkoutTag = (title = "") => {
   return "Run";
 };
 
-const normalizeSegments = (option) => {
+const normalizeSegments = (option, { includePaceFallback = true } = {}) => {
   if (Array.isArray(option?.segments) && option.segments.length > 0) {
     return option.segments;
   }
@@ -107,7 +107,7 @@ const normalizeSegments = (option) => {
     {
       name: "Session",
       instruction: option?.details || "Follow this run as prescribed.",
-      target_pace: option?.target_pace || "By feel",
+      target_pace: option?.target_pace || (includePaceFallback ? "By feel" : ""),
       rpe: option?.rpe || "",
       workout_type: "RUN",
     },
@@ -376,7 +376,8 @@ const PlanApp = () => {
               { key: "quality_option", label: "Quality session", className: "runna-quality" },
             ].map((card, index) => {
               const option = aiWorkout[card.key] || {};
-              const segments = normalizeSegments(option);
+              const isEasyCard = card.key === "easy_option";
+              const segments = normalizeSegments(option, { includePaceFallback: !isEasyCard });
               return (
                 <article className={`runna-card ${card.className}`} key={card.key}>
                   <header className="runna-card-header">
@@ -387,7 +388,9 @@ const PlanApp = () => {
                     <div className="runna-content">
                       <p className="runna-tag">{getWorkoutTag(option.title)}</p>
                       <p className="runna-title">{option.title}</p>
-                      <p className="runna-subtitle">{formatPaceTarget(option.target_pace)} · RPE {option.rpe || "n/a"}</p>
+                      {!isEasyCard ? (
+                        <p className="runna-subtitle">{formatPaceTarget(option.target_pace)} · RPE {option.rpe || "n/a"}</p>
+                      ) : null}
                       <div className="runna-segments">
                         {segments.map((segment, segmentIndex) => (
                           <div className="runna-segment" key={`${card.key}-${segment.name}-${segmentIndex}`}>
@@ -397,10 +400,12 @@ const PlanApp = () => {
                                 {segment.repeat ? <span className="segment-repeat">Repeat x{segment.repeat}</span> : null}
                               </p>
                               <p className="segment-detail">{segment.instruction}</p>
-                              <p className="segment-meta">
-                                {formatPaceTarget(segment.target_pace)}
-                                {segment.rpe ? ` · RPE ${segment.rpe}` : ""}
-                              </p>
+                              {!isEasyCard ? (
+                                <p className="segment-meta">
+                                  {formatPaceTarget(segment.target_pace)}
+                                  {segment.rpe ? ` · RPE ${segment.rpe}` : ""}
+                                </p>
+                              ) : null}
                             </div>
                             <p className="segment-type">{segment.workout_type || "RUN"}</p>
                           </div>
