@@ -22,26 +22,24 @@ Recent training summary from Strava:
 
 Rules:
 - The quality option MUST match today's preferred quality type: ${preferredQualityType}.
-- Every segment must have a specific target pace and an effort range.
-- Use a clear segment structure so the athlete always knows exactly how hard to run at each point.
+- Easy option rules:
+  - Keep it to one simple prescription only.
+  - No intervals, no reps, no target pace, and no RPE.
+  - Use conversational pace wording only.
+  - segments should be empty or contain only one simple conversational segment.
+  - Determine easy-run distance from the Strava summary (weekly distance trends and recent load should size the distance).
+- Quality option rules:
+  - Use a clear warm-up / main set / cool-down structure.
+  - Include structured segments with target pace and effort ranges where needed.
 - If weekly load is high or last quality session was <2 days ago, reduce intensity and volume.
 
 Output in JSON only, no markdown, using exactly this schema:
 {
   "easy_option": {
     "title": "...",
-    "target_pace": "... min/km",
-    "rpe": "2-4",
-    "details": "Short summary sentence",
-    "segments": [
-      {
-        "name": "Warm-up",
-        "instruction": "...",
-        "target_pace": "... min/km",
-        "rpe": "2-3",
-        "workout_type": "RUN"
-      }
-    ]
+    "distance_km": 8,
+    "details": "Single-sentence conversational easy run prescription with no pace numbers",
+    "segments": []
   },
   "quality_option": {
     "title": "...",
