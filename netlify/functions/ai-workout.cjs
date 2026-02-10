@@ -76,7 +76,35 @@ Output in JSON only, no markdown, using exactly this schema:
 }
 `.trim();
 
+const computeFallbackEasyDistanceKm = (summary) => {
+  const weeklyAverageKm = Number(summary.weeklyAverageKm) || 0;
+  const weeklyDistances = Array.isArray(summary.weeklyDistancesKm)
+    ? summary.weeklyDistancesKm.filter((distance) => Number.isFinite(Number(distance))).map(Number)
+    : [];
+  const lastQualityDays = Number(summary.lastQualityDays);
+
+  const recentWeekKm = weeklyDistances.length ? weeklyDistances[weeklyDistances.length - 1] : weeklyAverageKm;
+  const priorWeekKm = weeklyDistances.length > 1 ? weeklyDistances[weeklyDistances.length - 2] : recentWeekKm;
+  const trendRatio = priorWeekKm > 0 ? recentWeekKm / priorWeekKm : 1;
+
+  // Typical easy day is around 20-30% of weekly load, then tuned by recovery and trend.
+  const baseDistanceKm = Math.max(5, weeklyAverageKm * 0.24);
+  const recoveryAdjustment =
+    Number.isFinite(lastQualityDays) && lastQualityDays <= 1
+      ? 0.85
+      : Number.isFinite(lastQualityDays) && lastQualityDays >= 4
+        ? 1.08
+        : 1;
+  const trendAdjustment = trendRatio >= 1.15 ? 0.92 : trendRatio <= 0.9 ? 1.05 : 1;
+
+  const adjustedDistanceKm = baseDistanceKm * recoveryAdjustment * trendAdjustment;
+  return Math.min(18, Math.max(5, Math.round(adjustedDistanceKm * 2) / 2));
+};
+
 const fallbackWorkout = ({ summary, preferredQualityType }) => {
+  const weeklyDistancesText = Array.isArray(summary.weeklyDistancesKm)
+    ? summary.weeklyDistancesKm.join(", ")
+    : "N/A";
   const qualityLibrary = {
     intervals: {
       title: "Interval development session",
@@ -169,41 +197,26 @@ const fallbackWorkout = ({ summary, preferredQualityType }) => {
     },
   };
 
+  const easyDistanceKm = computeFallbackEasyDistanceKm(summary);
+
   return {
     easy_option: {
       title: "Easy aerobic run",
-      target_pace: "5:35-5:55 min/km",
-      rpe: "2-4",
-      details: "Easy run with explicit pacing for warm-up, main set, and cool down.",
+      details: `Run ${easyDistanceKm} km at conversational pace.`,
       segments: [
         {
-          name: "Warm-up",
-          instruction: "10 min relaxed jog",
-          target_pace: "5:50-6:10 min/km",
-          rpe: "2-3",
-          workout_type: "RUN",
-        },
-        {
-          name: "Main run",
-          instruction: "35 min conversational running",
-          target_pace: "5:35-5:55 min/km",
-          rpe: "3-4",
-          workout_type: "RUN",
-        },
-        {
-          name: "Cool down",
-          instruction: "8 min easy jog",
-          target_pace: "5:55-6:20 min/km",
-          rpe: "2-3",
+          name: "Easy run",
+          instruction: `Run ${easyDistanceKm} km at conversational pace.`,
           workout_type: "RUN",
         },
       ],
     },
     quality_option: qualityLibrary[preferredQualityType] || qualityLibrary.tempo,
     reasoning: [
-      `Weekly average is ${summary.weeklyAverageKm} km, so a controlled quality day is appropriate.`,
+      `Easy distance is set to ${easyDistanceKm} km using your weekly average (${summary.weeklyAverageKm} km) and recent weekly trend (${weeklyDistancesText} km).`,
+      `Recovery was adjusted using last quality timing (${summary.lastQualityDays} days ago), so today's easy load matches current freshness.`,
       `Today's preferred quality type is ${preferredQualityType}, and the session follows that structure.`,
-      "Segment-level pace guidance is included so effort is clear throughout the workout.",
+      "Easy day guidance is intentionally simple: one conversational-pace instruction without extra pace or interval structure.",
     ],
     warnings: [],
   };
