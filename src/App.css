@@ -463,4 +463,12 @@ select {
   .runna-segment {
     grid-template-columns: 1fr;
   }
+
+  .runna-card-body {
+    grid-template-columns: 44px 1fr;
+  }
+
+  .runna-segment {
+    grid-template-columns: 1fr;
+  }
 }
