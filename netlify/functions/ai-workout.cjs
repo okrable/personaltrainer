@@ -1,4 +1,5 @@
-const OPENAI_URL = "https://api.openai.com/v1/chat/completions";
+const DEFAULT_BASE_URL = "https://api.groq.com/openai/v1";
+const CHAT_PATH = "/chat/completions";
 
 const buildPrompt = ({ goal, plan, summary, preferences }) => `
 You are a running coach. Use the athlete's context below to recommend two workout options
@@ -47,7 +48,7 @@ exports.handler = async (event) => {
       };
     }
 
-    if (!process.env.OPENAI_API_KEY) {
+    if (!process.env.GROQ_API_KEY) {
       return {
         statusCode: 200,
         body: JSON.stringify({
@@ -57,14 +58,15 @@ exports.handler = async (event) => {
       };
     }
 
-    const response = await fetch(OPENAI_URL, {
+    const baseUrl = process.env.GROQ_BASE_URL || DEFAULT_BASE_URL;
+    const response = await fetch(`${baseUrl}${CHAT_PATH}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
       },
       body: JSON.stringify({
-        model: process.env.OPENAI_MODEL || "gpt-4o-mini",
+        model: process.env.GROQ_MODEL || "llama-3.1-8b-instant",
         messages: [
           {
             role: "system",
@@ -99,7 +101,7 @@ exports.handler = async (event) => {
 
     return {
       statusCode: 200,
-      body: JSON.stringify({ workout, source: "openai" }),
+      body: JSON.stringify({ workout, source: "groq" }),
     };
   } catch (error) {
     return {
