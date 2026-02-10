@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import "./App.css";
 
 const phaseMap = [
@@ -96,6 +96,11 @@ const PlanApp = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
+  const [isDarkMode, setIsDarkMode] = useState(true);
+
+  useEffect(() => {
+    document.body.classList.toggle("dark-mode", isDarkMode);
+  }, [isDarkMode]);
 
   const planData = useMemo(() => {
     const raceDate = new Date(settings.raceDate);
@@ -213,9 +218,20 @@ const PlanApp = () => {
             training load.
           </p>
         </div>
-        <button className="button primary" type="button" onClick={openModal}>
-          Adjust inputs
-        </button>
+        <div className="hero-actions">
+          <label className="toggle">
+            <input
+              type="checkbox"
+              checked={isDarkMode}
+              onChange={(event) => setIsDarkMode(event.target.checked)}
+            />
+            <span className="toggle-slider" />
+            <span className="toggle-label">Dark mode</span>
+          </label>
+          <button className="button primary" type="button" onClick={openModal}>
+            Adjust inputs
+          </button>
+        </div>
       </header>
 
       <section className="summary" aria-live="polite">

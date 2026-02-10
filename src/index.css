@@ -1,5 +1,5 @@
 :root {
-  color-scheme: light;
+  color-scheme: light dark;
   --bg: #f5f7fb;
   --surface: #ffffff;
   --primary: #2f67ff;
@@ -7,6 +7,16 @@
   --muted: #5b6b7c;
   --border: #d7dde6;
   --pill: #eff4ff;
+}
+
+body.dark-mode {
+  --bg: #0c1426;
+  --surface: #101d33;
+  --primary: #6ea1ff;
+  --text: #f2f6ff;
+  --muted: #b2bfd4;
+  --border: #223252;
+  --pill: rgba(110, 161, 255, 0.16);
 }
 
 * {
