@@ -1,0 +1,260 @@
+.app {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 32px 24px 64px;
+}
+
+.hero {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+  background: var(--surface);
+  padding: 28px 32px;
+  border-radius: 20px;
+  box-shadow: 0 18px 40px rgba(16, 34, 58, 0.08);
+}
+
+.eyebrow {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+  margin: 0 0 6px;
+}
+
+h1 {
+  margin: 0;
+  font-size: 2.4rem;
+}
+
+.subhead {
+  margin: 8px 0 0;
+  max-width: 560px;
+  color: var(--muted);
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.button {
+  border: none;
+  border-radius: 999px;
+  padding: 12px 22px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.button.primary {
+  background: var(--primary);
+  color: white;
+}
+
+.button.ghost {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.summary {
+  margin-top: 28px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.integrations,
+.strava-summary,
+.ai-workout {
+  margin-top: 32px;
+}
+
+.integrations {
+  display: grid;
+  gap: 24px;
+}
+
+.integration-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+}
+
+.integration-card p {
+  margin: 6px 0 0;
+  color: var(--muted);
+}
+
+.status {
+  margin: 8px 0 0;
+  font-size: 0.95rem;
+  color: #e6f0ff;
+}
+
+.ai-reasoning ul {
+  margin: 8px 0 0;
+  padding-left: 20px;
+}
+
+.ai-reasoning h4 {
+  margin: 8px 0;
+}
+
+.summary h2 {
+  margin: 0 0 8px;
+}
+
+.summary p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.card {
+  background: var(--surface);
+  border-radius: 18px;
+  padding: 20px 24px;
+  box-shadow: 0 16px 30px rgba(16, 34, 58, 0.06);
+}
+
+.metrics {
+  min-width: 280px;
+  display: grid;
+  gap: 16px;
+}
+
+.metrics .label {
+  font-size: 0.85rem;
+  margin: 0 0 4px;
+  color: var(--muted);
+}
+
+.metrics .value {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.workouts {
+  margin-top: 32px;
+  display: grid;
+  gap: 24px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.workout-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.pill {
+  background: var(--pill);
+  color: var(--primary);
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.workout-main {
+  font-size: 1.3rem;
+  margin: 16px 0 8px;
+  font-weight: 600;
+}
+
+.workout-detail {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.explain {
+  margin-top: 32px;
+  background: var(--surface);
+  border-radius: 18px;
+  padding: 20px 24px;
+}
+
+.explain ul {
+  margin: 12px 0 0;
+  padding-left: 18px;
+  color: var(--muted);
+}
+
+.modal {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+}
+
+.modal.open {
+  display: flex;
+}
+
+.modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(12, 20, 38, 0.4);
+}
+
+.modal-content {
+  position: relative;
+  background: var(--surface);
+  border-radius: 20px;
+  padding: 24px;
+  width: min(680px, 92vw);
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 24px 50px rgba(16, 34, 58, 0.2);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+input,
+select {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 0.95rem;
+  color: var(--text);
+}
+
+.modal-actions {
+  margin-top: 20px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+@media (max-width: 720px) {
+  .hero {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
